@@ -1,38 +1,5 @@
 #!/usr/bin/env bash
 
-# 更新系统
-echo "正在更新系统..."
-sudo apt update -y && sudo apt upgrade -y
-
-# 安装 Git
-echo "正在安装 Git..."
-sudo apt install -y git curl
-
-# 检查 Docker 是否已安装
-if ! command -v docker &> /dev/null; then
-  echo "未找到 Docker，正在安装 Docker..."
-  sudo apt install -y docker.io
-else
-  echo "Docker 已安装。"
-fi
-
-# 检查并安装或更新 Docker Compose
-if command -v docker-compose &> /dev/null; then
-  DOCKER_COMPOSE_CURRENT_VERSION=$(docker-compose --version | awk '{print $3}' | sed 's/,//g')
-  
-  if [[ "$DOCKER_COMPOSE_CURRENT_VERSION" =~ ^1 ]]; then
-    echo "检测到 Docker Compose 版本为 1，正在更新到版本 2..."
-    sudo curl -L "https://github.com/docker/compose/releases/download/v$DOCKER_COMPOSE_VERSION/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-    sudo chmod +x /usr/local/bin/docker-compose
-  else
-    echo "Docker Compose 已是 2 或更高版本。"
-  fi
-else
-  echo "未找到 Docker Compose，正在安装 Docker Compose..."
-  sudo curl -L "https://github.com/docker/compose/releases/download/v$DOCKER_COMPOSE_VERSION/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-  sudo chmod +x /usr/local/bin/docker-compose
-fi
-
 # 验证十六进制私钥格式
 validate_hex() {
   if [[ ! "$1" =~ ^0x[0-9a-fA-F]{64}$ ]]; then
@@ -111,22 +78,28 @@ install_nodes() {
   PORT_INCREMENT=6
 
   install_single_node() {
-    local i=$1
-    local NODE_DIR="${BASE_DIR}/node${i}"
-    mkdir -p "$NODE_DIR"
-    echo "在 $NODE_DIR 中设置节点 $i"
+  local i=$1
+  local NODE_DIR="${BASE_DIR}/node${i}"
+  mkdir -p "$NODE_DIR"
+  echo "在 $NODE_DIR 中设置节点 $i"
 
-    read -p "节点 $i 是否手动输入私钥？ (y/n): " input_key
-    if [[ "$input_key" == "y" ]]; then
-      read -p "输入节点 $i 的私钥 (以 0x 开头): " PRIVATE_KEY
-      validate_hex "$PRIVATE_KEY"
-      echo "$PRIVATE_KEY" > "${NODE_DIR}/private_key"
-    else
-      PRIVATE_KEY=$(openssl rand -hex 32)
-      PRIVATE_KEY="0x$PRIVATE_KEY"
-      echo "$PRIVATE_KEY" > "${NODE_DIR}/private_key"
-      echo "为节点 $i 生成的私钥: $PRIVATE_KEY"
-    fi
+  # 检查私钥文件是否存在
+  if [ ! -f "$NODE_DIR/private_key" ]; then
+    # 私钥文件不存在，生成新的私钥
+    PRIVATE_KEY=$(openssl rand -hex 32)
+    PRIVATE_KEY="0x$PRIVATE_KEY"
+    echo "$PRIVATE_KEY" > "${NODE_DIR}/private_key"
+    echo "为节点 $i 生成的私钥: $PRIVATE_KEY"
+  else
+    # 私钥文件存在，读取现有私钥
+    PRIVATE_KEY=$(cat "$NODE_DIR/private_key")
+    echo "为节点 $i 读取现有私钥: $PRIVATE_KEY"
+  fi
+
+  validate_hex "$PRIVATE_KEY"
+
+  ADMIN_ADDRESS=$(generate_address_from_private_key "$PRIVATE_KEY")
+  echo "为节点 $i 生成的管理员地址: 0x$ADMIN_ADDRESS"
 
     validate_hex "$PRIVATE_KEY"
 
@@ -333,18 +306,72 @@ uninstall_nodes() {
   echo "卸载完成。"
 }
 
+# 读取所有生成的私钥
+read_all_private_keys() {
+  BASE_DIR="/root/ocean"
+  START_INDEX=1 # 或者根据你的需求修改起始索引
+  END_INDEX=$(ls -l "$BASE_DIR"/node* | wc -l) # 动态获取节点数量
+  echo "读取所有节点私钥："
+
+  for ((i=START_INDEX; i<=END_INDEX; i++)); do
+    NODE_DIR="${BASE_DIR}/node${i}"
+    if [ -f "$NODE_DIR/private_key" ]; then
+      PRIVATE_KEY=$(cat "$NODE_DIR/private_key")
+      echo "节点 ${i}: $PRIVATE_KEY"
+    else
+      echo "警告: 未找到节点 ${i} 的私钥文件。"
+    fi
+  done
+}
+# 单独重启节点容器
+restart_single_node() {
+  local node_index=$1
+  local NODE_DIR="/root/ocean/node${node_index}"
+
+  if [ -d "$NODE_DIR" ]; then
+    if [ -f "$NODE_DIR/docker-compose.yml" ]; then
+      echo "正在重启节点 ${node_index}..."
+      (cd "$NODE_DIR" && docker-compose restart)
+      if [ $? -eq 0 ]; then
+        echo "节点 ${node_index} 重启成功。"
+      else
+        echo "节点 ${node_index} 重启失败。"
+      fi
+    else
+      echo "错误：未找到节点 ${node_index} 的 docker-compose.yml 文件。"
+    fi
+  else
+    echo "错误：未找到节点 ${node_index} 的目录。"
+  fi
+}
+
+
 # 主脚本
 echo "Ocean 节点管理脚本"
 echo "1. 安装 Ocean 节点"
 echo "2. 卸载 Ocean 节点"
-read -p "输入你的选择 (1 或 2): " choice
+echo "3. 读取所有私钥"
+echo "4. 重启节点 (支持多选)"  # 修改菜单选项
+read -p "输入你的选择 (1, 2, 3 或 4): " choice
 
 case $choice in
   1)
     install_nodes
+    read_all_private_keys
     ;;
   2)
     uninstall_nodes
+    ;;
+  3)
+    read_all_private_keys
+    ;;
+  4)
+    read -p "输入要重启的节点索引 (用空格分隔，例如 1 2 3): " node_indices
+    IFS=' ' read -r -a indices <<< "$node_indices" # 将输入分割成数组
+
+    for node_index in "${indices[@]}"; do
+      restart_single_node "$node_index"
+    done
     ;;
   *)
     echo "无效的选择。退出。"
