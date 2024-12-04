@@ -74,8 +74,8 @@ install_nodes() {
   validate_ip_or_fqdn "$P2P_ANNOUNCE_ADDRESS"
 
   # 通过安装批次自动调整 BASE_HTTP_PORT
-  BASE_HTTP_PORT=$((10000 + (START_INDEX - 1) * 4))
-  PORT_INCREMENT=4
+  BASE_HTTP_PORT=$((10000 + (START_INDEX - 1) * 6))
+  PORT_INCREMENT=6
 
   install_single_node() {
   local i=$1
@@ -103,16 +103,20 @@ install_nodes() {
 
     validate_hex "$PRIVATE_KEY"
 
-  HTTP_PORT=$((10000 + i * 10))    
-  P2P_TCP_PORT=$((10000 + i))       
-  P2P_WS_PORT=$((10010 + i))         
-  TYPESENSE_PORT=$((10000 + i * 100))
 
-
-  validate_port "$HTTP_PORT"
-  validate_port "$P2P_TCP_PORT"
-  validate_port "$P2P_WS_PORT"
-  validate_port "$TYPESENSE_PORT"
+   HTTP_PORT=$((10000 + i))           # HTTP_PORT基于容器编号递增
+   P2P_TCP_PORT=$((20000 + i))             # P2P_TCP_PORT基于容器编号递增
+   P2P_WS_PORT=$((30000 + i))
+   P2P_IPV6_TCP_PORT=$((40000 + i))
+   P2P_IPV6_WS_PORT=$((50000 + i))
+   TYPESENSE_PORT=$((60000 + i))
+   
+    validate_port "$HTTP_PORT"
+    validate_port "$P2P_TCP_PORT"
+    validate_port "$P2P_WS_PORT"
+    validate_port "$P2P_IPV6_TCP_PORT"
+    validate_port "$P2P_IPV6_WS_PORT"
+    validate_port "$TYPESENSE_PORT"
 
 
     if [[ "$P2P_ANNOUNCE_ADDRESS" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
@@ -123,6 +127,7 @@ install_nodes() {
       P2P_ANNOUNCE_ADDRESSES=''
       echo "未提供输入，其他节点可能无法访问 Ocean 节点。"
     fi
+    # 生成 docker-compose.yml
 cat <<EOF > "${NODE_DIR}/docker-compose.yml"
 services:
   ocean-node:
@@ -133,6 +138,8 @@ services:
       - "${HTTP_PORT}:8000"
       - "${P2P_TCP_PORT}:9000"
       - "${P2P_WS_PORT}:9001"
+      - "${P2P_IPV6_TCP_PORT}:9002"
+      - "${P2P_IPV6_WS_PORT}:9003"
     environment:
       PRIVATE_KEY: '${PRIVATE_KEY}'
       RPCS: |
@@ -214,9 +221,13 @@ services:
       DASHBOARD: 'true'
       HTTP_API_PORT: '8000'
       P2P_ENABLE_IPV4: 'true'
+      P2P_ENABLE_IPV6: 'true'
       P2P_ipV4BindAddress: '0.0.0.0'
       P2P_ipV4BindTcpPort: '9000'
       P2P_ipV4BindWsPort: '9001'
+      P2P_ipV6BindAddress: '::'
+      P2P_ipV6BindTcpPort: '9002'
+      P2P_ipV6BindWsPort: '9003'
       P2P_ANNOUNCE_ADDRESSES: '${P2P_ANNOUNCE_ADDRESSES}'
     networks:
       - ocean_network
