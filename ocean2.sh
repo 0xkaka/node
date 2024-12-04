@@ -123,9 +123,121 @@ install_nodes() {
       P2P_ANNOUNCE_ADDRESSES=''
       echo "未提供输入，其他节点可能无法访问 Ocean 节点。"
     fi
-    # 生成 docker-compose.yml
-#...(docker-compose.yml 文件内容，太长省略)
-
+cat <<EOF > "${NODE_DIR}/docker-compose.yml"
+services:
+  ocean-node:
+    image: oceanprotocol/ocean-node:latest
+    container_name: ocean-node-${i}
+    restart: on-failure
+    ports:
+      - "${HTTP_PORT}:8000"
+      - "${P2P_TCP_PORT}:9000"
+      - "${P2P_WS_PORT}:9001"
+    environment:
+      PRIVATE_KEY: '${PRIVATE_KEY}'
+      RPCS: |
+        {
+          "1": {
+            "rpc": "https://ethereum-rpc.publicnode.com",
+            "fallbackRPCs": [
+              "https://rpc.ankr.com/eth",
+              "https://1rpc.io/eth",
+              "https://eth.api.onfinality.io/public"
+            ],
+            "chainId": 1,
+            "network": "mainnet",
+            "chunkSize": 100
+          },
+          "10": {
+            "rpc": "https://mainnet.optimism.io",
+            "fallbackRPCs": [
+              "https://optimism-mainnet.public.blastapi.io",
+              "https://rpc.ankr.com/optimism",
+              "https://optimism-rpc.publicnode.com"
+            ],
+            "chainId": 10,
+            "network": "optimism",
+            "chunkSize": 100
+          },
+          "137": {
+            "rpc": "https://polygon-rpc.com/",
+            "fallbackRPCs": [
+              "https://polygon-mainnet.public.blastapi.io",
+              "https://1rpc.io/matic",
+              "https://rpc.ankr.com/polygon"
+            ],
+            "chainId": 137,
+            "network": "polygon",
+            "chunkSize": 100
+          },
+          "23294": {
+            "rpc": "https://sapphire.oasis.io",
+            "fallbackRPCs": [
+              "https://1rpc.io/oasis/sapphire"
+            ],
+            "chainId": 23294,
+            "network": "sapphire",
+            "chunkSize": 100
+          },
+          "23295": {
+            "rpc": "https://testnet.sapphire.oasis.io",
+            "chainId": 23295,
+            "network": "sapphire-testnet",
+            "chunkSize": 100
+          },
+          "11155111": {
+            "rpc": "https://eth-sepolia.public.blastapi.io",
+            "fallbackRPCs": [
+              "https://1rpc.io/sepolia",
+              "https://eth-sepolia.g.alchemy.com/v2/demo"
+            ],
+            "chainId": 11155111,
+            "network": "sepolia",
+            "chunkSize": 100
+          },
+          "11155420": {
+            "rpc": "https://sepolia.optimism.io",
+            "fallbackRPCs": [
+              "https://endpoints.omniatech.io/v1/op/sepolia/public",
+              "https://optimism-sepolia.blockpi.network/v1/rpc/public"
+            ],
+            "chainId": 11155420,
+            "network": "optimism-sepolia",
+            "chunkSize": 100
+          }
+        }
+      DB_URL: 'http://typesense:8108/?apiKey=xyz'
+      IPFS_GATEWAY: 'https://ipfs.io/'
+      ARWEAVE_GATEWAY: 'https://arweave.net/'
+      INTERFACES: '["HTTP","P2P"]'
+      ALLOWED_ADMINS: '["0x${ADMIN_ADDRESS}"]'
+      DASHBOARD: 'true'
+      HTTP_API_PORT: '8000'
+      P2P_ENABLE_IPV4: 'true'
+      P2P_ipV4BindAddress: '0.0.0.0'
+      P2P_ipV4BindTcpPort: '9000'
+      P2P_ipV4BindWsPort: '9001'
+      P2P_ANNOUNCE_ADDRESSES: '${P2P_ANNOUNCE_ADDRESSES}'
+    networks:
+      - ocean_network
+    volumes:
+      - ${NODE_DIR}:/app/data
+    depends_on:
+      - typesense
+  typesense:
+    image: typesense/typesense:26.0
+    container_name: typesense-${i}
+    ports:
+      - "${TYPESENSE_PORT}:8108"
+    networks:
+      - ocean_network
+    volumes:
+      - ${NODE_DIR}/typesense-data:/data
+    command: '--data-dir /data --api-key=xyz'
+networks:
+  ocean_network:
+    driver: bridge
+EOF
 
 
     if [ ! -f "${NODE_DIR}/docker-compose.yml" ]; then
