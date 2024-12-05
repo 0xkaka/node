@@ -101,9 +101,6 @@ install_nodes() {
   ADMIN_ADDRESS=$(generate_address_from_private_key "$PRIVATE_KEY")
   echo "为节点 $i 生成的管理员地址: 0x$ADMIN_ADDRESS"
 
-    validate_hex "$PRIVATE_KEY"
-
-
    HTTP_PORT=$((10000 + i))           # HTTP_PORT基于容器编号递增
    P2P_TCP_PORT=$((20000 + i))             # P2P_TCP_PORT基于容器编号递增
    P2P_WS_PORT=$((30000 + i))
