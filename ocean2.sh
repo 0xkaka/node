@@ -210,6 +210,18 @@ services:
             "chunkSize": 100
           }
         }
+      DB_URL: 'http://typesense:8108/?apiKey=xyz'
+      IPFS_GATEWAY: 'https://ipfs.io/'
+      ARWEAVE_GATEWAY: 'https://arweave.net/'
+      INTERFACES: '["HTTP","P2P"]'
+      ALLOWED_ADMINS: '["0x${ADMIN_ADDRESS}"]'
+      DASHBOARD: 'true'
+      HTTP_API_PORT: '8000'
+      P2P_ENABLE_IPV4: 'true'
+      P2P_ipV4BindAddress: '0.0.0.0'
+      P2P_ipV4BindTcpPort: '9000'
+      P2P_ipV4BindWsPort: '9001'
+      P2P_ANNOUNCE_ADDRESSES: '${P2P_ANNOUNCE_ADDRESSES}'
     networks:
       - ocean_network
     volumes:
