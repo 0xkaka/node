@@ -1,0 +1,44 @@
+import requests
+
+# 读取地址文件
+def read_addresses(file_path):
+    with open(file_path, 'r') as file:
+        return [line.strip() for line in file.readlines()]
+
+# 查询每个地址
+def query_address(address):
+    url = f"https://metrics.dria.co/api/v1/node_metrics?skip=0&limit=20&address={address}"
+    response = requests.get(url)
+
+    if response.status_code == 200:
+        data = response.json()
+
+        # 检查 'items' 是否存在且有内容
+        if 'items' in data and len(data['items']) > 0:
+            completedStep = data['items'][0].get('completedStep', 'No completedStep found')
+            return completedStep
+        else:
+            return "No data found"
+    else:
+        return f"Failed to fetch data for {address}, status code: {response.status_code}"
+
+# 主函数
+def batch_query_addresses(addresses_file):
+    addresses = read_addresses(addresses_file)
+
+    for address in addresses:
+        result = query_address(address)
+
+        if result != "No data found" and result != "Failed to fetch data":
+            try:
+                current_completedStep = int(result)
+                print(current_completedStep)
+            except ValueError:
+                print(0)  # 如果返回的值不是数字，则输出0
+        else:
+            print(0)  # 如果没有数据则输出0
+
+# 使用时
+if __name__ == "__main__":
+    # 输入地址文件
+    batch_query_addresses('addresses.txt')
