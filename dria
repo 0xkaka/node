@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # 提示用户输入文件夹起始和结束索引
-read -p "请输入需要启动的文件夹起始索引（例如 37）: " START_FOLDER
-read -p "请输入需要启动的文件夹结束索引（例如 41）: " END_FOLDER
+read -p "请输入需要启动的文件夹起始索引: " START_FOLDER
+read -p "请输入需要启动的文件夹结束索引: " END_FOLDER
 
 # 检查索引是否有效
 if [ "$START_FOLDER" -ge "$END_FOLDER" ]; then
@@ -67,7 +67,7 @@ for ((i=0; i<$NUM_FOLDERS; i++)); do
   fi
 
   # 复制文件夹及其内容
-  cp -r "/root/dkn-compute-node-kb" "$TARGET_FOLDER"
+  cp -r "/root/dkn-compute-node" "$TARGET_FOLDER"
 
   # 修改 .env 文件中的 DKN_P2P_LISTEN_ADDR 配置
   sed -i "s|DKN_P2P_LISTEN_ADDR=/ip4/0.0.0.0/tcp/[0-9]*|DKN_P2P_LISTEN_ADDR=/ip4/0.0.0.0/tcp/$PORT_NUMBER|" "$TARGET_FOLDER/.env"
