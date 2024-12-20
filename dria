@@ -1,0 +1,96 @@
+#!/bin/bash
+
+# 提示用户输入文件夹起始和结束索引
+read -p "请输入需要启动的文件夹起始索引（例如 37）: " START_FOLDER
+read -p "请输入需要启动的文件夹结束索引（例如 41）: " END_FOLDER
+
+# 检查索引是否有效
+if [ "$START_FOLDER" -ge "$END_FOLDER" ]; then
+  echo "起始索引必须小于结束索引。"
+  exit 1
+fi
+
+# 计算需要的文件夹数量
+NUM_FOLDERS=$((END_FOLDER - START_FOLDER + 1))
+echo "需要创建的文件夹数量是 $NUM_FOLDERS"
+
+# 提示用户输入私钥数量
+echo "你需要输入 $NUM_FOLDERS 个私钥，请逐个输入。"
+
+# 创建一个临时文件保存私钥
+PRIVATE_KEYS_FILE="/root/private_keys.txt"
+> "$PRIVATE_KEYS_FILE"  # 清空之前的私钥文件
+
+# 读取私钥并保存
+for ((i=1; i<=NUM_FOLDERS; i++)); do
+  read -p "请输入私钥 $i: " PRIVATE_KEY
+  echo "$PRIVATE_KEY" >> "$PRIVATE_KEYS_FILE"
+done
+
+# 检查私钥文件是否成功保存
+if [ ! -f "$PRIVATE_KEYS_FILE" ]; then
+  echo "私钥文件保存失败，请检查权限。"
+  exit 1
+fi
+
+# 读取私钥列表
+mapfile -t PRIVATE_KEYS < "$PRIVATE_KEYS_FILE"
+
+# 确保私钥数量足够
+if [ ${#PRIVATE_KEYS[@]} -lt $NUM_FOLDERS ]; then
+  echo "私钥数量不足，请确保输入足够的私钥。"
+  exit 1
+fi
+
+# 循环创建文件夹并更新配置
+for ((i=0; i<$NUM_FOLDERS; i++)); do
+  # 计算文件夹名称和端口号
+  FOLDER_NAME=$((START_FOLDER + i))
+  PORT_NUMBER=$((FOLDER_NAME + 3000))  # 根据索引号计算端口号，索引号 + 3000
+  PRIVATE_KEY=${PRIVATE_KEYS[$i]}
+
+  echo "为文件夹 $FOLDER_NAME 计算的端口号是 $PORT_NUMBER"
+
+  # 检查端口是否已被占用，如果占用则递增端口号
+  while lsof -i :$PORT_NUMBER &>/dev/null; do
+    echo "端口 $PORT_NUMBER 已被占用，正在尝试使用端口 $((PORT_NUMBER + 1))"
+    PORT_NUMBER=$((PORT_NUMBER + 1))
+  done
+
+  # 目标文件夹路径
+  TARGET_FOLDER="/root/$FOLDER_NAME"
+
+  # 如果文件夹已存在，则删除并重新创建
+  if [ -d "$TARGET_FOLDER" ]; then
+    echo "目标文件夹 $FOLDER_NAME 已存在，正在删除并重新创建..."
+    rm -rf "$TARGET_FOLDER"
+  fi
+
+  # 复制文件夹及其内容
+  cp -r "/root/dkn-compute-node-kb" "$TARGET_FOLDER"
+
+  # 修改 .env 文件中的 DKN_P2P_LISTEN_ADDR 配置
+  sed -i "s|DKN_P2P_LISTEN_ADDR=/ip4/0.0.0.0/tcp/[0-9]*|DKN_P2P_LISTEN_ADDR=/ip4/0.0.0.0/tcp/$PORT_NUMBER|" "$TARGET_FOLDER/.env"
+
+  # 更新 .env 文件中的 DKN_WALLET_SECRET_KEY
+  sed -i "s|DKN_WALLET_SECRET_KEY=.*|DKN_WALLET_SECRET_KEY=$PRIVATE_KEY|" "$TARGET_FOLDER/.env"
+
+  # 提示用户
+  echo "文件夹 $FOLDER_NAME 复制完成，端口号设置为 $PORT_NUMBER，私钥已设置。"
+
+  # 创建并进入新的 screen 会话，并执行 ./dkn-compute-launcher
+  echo "正在创建并进入新的 screen 会话..."
+  screen -S "$FOLDER_NAME" -dm bash -c "cd $TARGET_FOLDER && echo -e '\n' | ./dkn-compute-launcher"
+
+  # 提示用户
+  echo "新的 screen 会话 '$FOLDER_NAME' 已创建并已进入，且 ./dkn-compute-launcher 已自动启动。"
+done
+
+# 脚本继续运行，直到用户按 Enter 键退出，并自动连接到第一个 screen 会话
+read -p "按 Enter 键进入第一个 screen 会话 '$START_FOLDER'..."
+
+# 切换到第一个 screen 会话
+screen -r "$START_FOLDER"
+
+# 退出脚本
+exit 0
