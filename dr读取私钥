@@ -15,7 +15,7 @@ NUM_FOLDERS=$((END_FOLDER - START_FOLDER + 1))
 echo "需要创建的文件夹数量是 $NUM_FOLDERS"
 
 # 私钥文件路径
-PRIVATE_KEYS_FILE="/root/private_keys.txt"
+PRIVATE_KEYS_FILE="/root/keys.txt"
 
 # 检查私钥文件是否存在
 if [ ! -f "$PRIVATE_KEYS_FILE" ]; then
