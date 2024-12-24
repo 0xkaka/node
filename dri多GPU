@@ -38,6 +38,11 @@ if [ ${#PRIVATE_KEYS[@]} -lt $NUM_FOLDERS ]; then
   exit 1
 fi
 
+# 提示用户选择 GPU
+read -p "请输入要使用的 GPU（例如 0 表示 GPU0, 1 表示 GPU1, 等等）: " GPU_CHOICE
+export CUDA_VISIBLE_DEVICES=$GPU_CHOICE
+echo "已选择 GPU$GPU_CHOICE."
+
 # 循环创建文件夹并更新配置
 for ((i=0; i<$NUM_FOLDERS; i++)); do
   # 计算文件夹名称和端口号
@@ -74,9 +79,9 @@ for ((i=0; i<$NUM_FOLDERS; i++)); do
   # 提示用户
   echo "文件夹 $FOLDER_NAME 复制完成，端口号设置为 $PORT_NUMBER，私钥已设置。"
 
-  # 创建并进入新的 screen 会话，并执行 dkn-compute-launcher，同时设置 GPU0
+  # 创建并进入新的 screen 会话，并执行 dkn-compute-launcher，同时设置 GPU
   echo "正在创建并进入新的 screen 会话..."
-  screen -S "$FOLDER_NAME" -dm bash -c "export CUDA_VISIBLE_DEVICES=0 && cd $TARGET_FOLDER && echo -e '\n' | ./dkn-compute-launcher"
+  screen -S "$FOLDER_NAME" -dm bash -c "export CUDA_VISIBLE_DEVICES=$GPU_CHOICE && cd $TARGET_FOLDER && echo -e '\n' | ./dkn-compute-launcher"
 
   # 提示用户
   echo "新的 screen 会话 '$FOLDER_NAME' 已创建并已进入，且 ./dkn-compute-launcher 已自动启动。"
